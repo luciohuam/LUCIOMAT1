@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LucioMAT 1</title>
+<style>
+  :root { --bg1:#071735; --bg2:#163d70; --accent:#65f4ff; --panel:#07162ddd; }
+  * { box-sizing:border-box }
+  body { margin:0; color:#fff; font-family:Arial,Helvetica,sans-serif; background:radial-gradient(circle at top,var(--bg2),var(--bg1) 72%); min-height:100vh; }
+  .wrap { max-width:1100px; margin:auto; padding:16px; }
+  header { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; margin-bottom:12px; }
+  h1 { margin:0; color:var(--accent); font-size:clamp(28px,4vw,42px); text-shadow:0 0 14px #44dfff66; }
+  .subtitle { color:#d9edff; margin-top:4px; font-size:14px; }
+  .hud { display:grid; grid-template-columns:repeat(4,minmax(100px,1fr)); gap:8px; margin-bottom:10px; }
+  .stat { background:#07162ddd; border:1px solid #ffffff25; border-radius:12px; padding:9px 12px; text-align:center; }
+  .stat small { display:block; color:#b9d8ff; font-size:12px; margin-bottom:4px; }
+  .stat strong { font-size:20px; }
+  .progress-shell { height:12px; background:#07162d; border-radius:99px; overflow:hidden; margin:8px 0 12px; border:1px solid #ffffff25; }
+  #progress { height:100%; width:0%; background:linear-gradient(90deg,#4dffb8,#65f4ff); transition:width .25s; }
+  .gamebox { position:relative; border:2px solid #ffffff3b; border-radius:18px; overflow:hidden; box-shadow:0 16px 45px #0006; background:#06132b; }
+  canvas { display:block; width:100%; height:auto; aspect-ratio:16/9; cursor:crosshair; touch-action:none; -webkit-user-select:none; user-select:none; }
+  .mobile-controls { display:none; justify-content:center; align-items:center; gap:12px; margin:10px auto 0; }
+  .mobile-controls button { min-width:64px; min-height:52px; font-size:22px; touch-action:manipulation; }
+  .mobile-controls .fire { min-width:104px; background:#ffdf68; }
+  button { touch-action:manipulation; }
+  html, body { -webkit-text-size-adjust:100%; overscroll-behavior:contain; }
+  @media (pointer:coarse), (max-width:760px) {
+    .wrap { padding:8px; }
+    header { margin-bottom:8px; }
+    .subtitle { font-size:12px; }
+    .hud { grid-template-columns:repeat(2,minmax(0,1fr)); gap:6px; }
+    .stat { padding:7px 5px; }
+    .stat strong { font-size:18px; }
+    .gamebox { border-radius:10px; }
+    .overlay { padding:8px; }
+    .dialog { padding:12px; max-height:95%; overflow:auto; }
+    .dialog h2 { font-size:clamp(19px,5vw,30px); }
+    .dialog p { font-size:13px; line-height:1.35; margin:8px 0; }
+    .dialog button { padding:11px 13px; }
+    .mobile-controls { display:flex; }
+    .help { font-size:11px; gap:6px; }
+    .bottom-controls button { flex:1 1 140px; margin:2px; padding:11px 8px; }
+  }
+  @media (max-width:390px) {
+    .wrap { padding:5px; }
+    h1 { font-size:25px; }
+    .stat small { font-size:10px; }
+    .mobile-controls { gap:6px; }
+    .mobile-controls button { min-width:58px; min-height:48px; }
+  }
+  @media (orientation:landscape) and (max-height:520px) and (pointer:coarse) {
+    header { margin-bottom:4px; }
+    .subtitle, .help, .feedback { display:none; }
+    .hud { grid-template-columns:repeat(4,minmax(0,1fr)); margin-bottom:4px; }
+    .stat { padding:4px; }
+    .progress-shell { margin:4px 0; height:7px; }
+    canvas { max-height:55vh; }
+    .mobile-controls { margin:3px auto; }
+    .mobile-controls button { min-height:40px; padding:5px 12px; }
+  }
+  .wrap:fullscreen { width:100vw; max-width:none; height:100vh; overflow:auto; padding:12px; background:radial-gradient(circle at top,var(--bg2),var(--bg1) 72%); }
+  .wrap:fullscreen .gamebox { max-width:100%; }
+  .wrap:fullscreen canvas { max-height:calc(100vh - 250px); width:100%; aspect-ratio:16/9; }
+  @media(max-height:650px){ .wrap:fullscreen .hud { margin-bottom:5px; } .wrap:fullscreen .progress-shell { margin:4px 0 6px; } .wrap:fullscreen .help { display:none; } .wrap:fullscreen canvas { max-height:calc(100vh - 170px); } }
+  .bottom-controls { display:flex; justify-content:center; align-items:center; flex-wrap:wrap; gap:8px; margin:14px 0 6px; }
+  .overlay { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; padding:18px; background:#031027c9; text-align:center; }
+  .overlay.hidden { display:none; }
+  .dialog { max-width:620px; width:100%; padding:24px; border-radius:18px; background:#0b2044f5; border:1px solid #8deaff77; box-shadow:0 0 35px #00c8ff24; }
+  .dialog h2 { color:var(--accent); margin:0 0 12px; font-size:clamp(24px,4vw,36px); }
+  .dialog p { line-height:1.5; color:#e5f2ff; }
+  button { cursor:pointer; border:0; border-radius:10px; padding:12px 18px; color:#041329; background:var(--accent); font-weight:bold; font-size:15px; margin:5px; }
+  button.secondary { color:#fff; background:#29466f; border:1px solid #ffffff2c; }
+  .help { display:flex; justify-content:space-between; gap:12px; flex-wrap:wrap; color:#d3e7ff; font-size:13px; margin:10px 2px 0; }
+  .feedback { min-height:28px; text-align:center; padding:7px; color:#ffe88a; font-weight:bold; }
+  @media(max-width:620px){ .hud{grid-template-columns:repeat(2,minmax(100px,1fr))} .wrap{padding:9px} .dialog{padding:16px} }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div><h1>🚀 LucioMAT 1</h1><div class="subtitle">¡Dispara a la respuesta correcta y demuestra tus poderes matemáticos!</div></div>
+  </header>
+  <section class="hud">
+    <div class="stat"><small>NIVEL</small><strong id="levelLabel">1 / 3</strong></div>
+    <div class="stat"><small>PUNTOS</small><strong id="score">0</strong></div>
+    <div class="stat"><small>TIEMPO DEL EJERCICIO</small><strong id="timer">30 s</strong></div>
+    <div class="stat"><small>ERRORES</small><strong id="errors">0 / 3</strong></div>
+  </section>
+  <div class="progress-shell" aria-label="Avance del nivel"><div id="progress"></div></div>
+  <div class="gamebox">
+    <canvas id="game" width="960" height="540" aria-label="Videojuego matemático"></canvas>
+    <div class="overlay" id="overlay">
+      <div class="dialog">
+        <h2 id="overlayTitle">¡Bienvenido a LucioMAT 1!</h2>
+        <p id="overlayText">Tu nave debe disparar a la nube que contiene el resultado correcto. Cada respuesta correcta suma 10 puntos y cada error resta 5. Tienes 30 segundos por ejercicio. Con 3 errores se reinicia el nivel actual; si ocurre 3 veces en ese mismo nivel, bajas un nivel.</p>
+        <p><b>Controles:</b> mueve la nave con ← → o A / D. Dispara con ESPACIO o haciendo clic en el área de juego.</p>
+        <button id="startBtn" type="button">¡Comenzar aventura!</button>
+      </div>
+    </div>
+  </div>
+  <div class="mobile-controls" id="mobileControls" aria-label="Controles táctiles">
+    <button class="secondary" id="leftBtn" type="button" aria-label="Mover a la izquierda">◀</button>
+    <button class="fire" id="fireBtn" type="button" aria-label="Disparar">🚀 DISPARAR</button>
+    <button class="secondary" id="rightBtn" type="button" aria-label="Mover a la derecha">▶</button>
+  </div>
+  <div class="feedback" id="feedback">Prepárate para despegar.</div>
+  <div class="help"><span>🖱️ Mueve el mouse a derecha o izquierda para dirigir la nave.</span><span>⌨️ También puedes usar ← → / A D.</span><span>🚀 Dispara con ESPACIO o clic.</span><span>📈 15 ejercicios por nivel</span></div>
+  <div class="bottom-controls"><button class="secondary" id="soundBtn" type="button">🔊 Música y sonido: activados</button><button class="secondary" id="fullscreenBtn" type="button">⛶ Pantalla completa</button></div>
+</div>
+<script>
+(() => {
+  const canvas = document.getElementById('game');
+  const ctx = canvas.getContext('2d');
+  const $ = id => document.getElementById(id);
+  const overlay = $('overlay');
+  const palettes = [
+    {sky:'#071735', glow:'#31eaff', cloud:'#e9f7ff', cloudEdge:'#8ddfff', ship:'#5fffd1', shot:'#fff27a', star:'#8be8ff'},
+    {sky:'#241044', glow:'#ff72d2', cloud:'#fff0fb', cloudEdge:'#f5a6df', ship:'#ffcf5a', shot:'#a8fffb', star:'#ffb2e8'},
+    {sky:'#082d26', glow:'#9cff65', cloud:'#f4fff0', cloudEdge:'#a6ef8d', ship:'#ff806b', shot:'#faff85', star:'#b8ff9c'}
+  ];
+  let level=0, exercise=0, score=0, errors=0, timeLeft=30, running=false, soundOn=true;
+  // Cuenta cuántas veces se reinicia cada nivel por acumular tres errores.
+  let levelRestarts=[0,0,0];
+  let lastTime=0, timerAccumulator=0, spawnAccumulator=0, shots=[], particles=[], clouds=[], stars=[];
+  let keys={}, feedbackTimeout=null, audioCtx=null, musicTimer=null, musicStep=0, currentProblem=null, ship={x:480,y:476,size:1,form:0,power:1,cooldown:0};
+  const totalExercises=45;
+  for(let i=0;i<90;i++) stars.push({x:Math.random()*960,y:Math.random()*540,r:Math.random()*1.7+.3,speed:Math.random()*18+5});
+  function audio(freq=440,duration=.09,type='sine',volume=.04){
+    if(!soundOn) return;
+    try { audioCtx ||= new (window.AudioContext||window.webkitAudioContext)(); const o=audioCtx.createOscillator(), g=audioCtx.createGain(); o.type=type; o.frequency.value=freq; g.gain.value=volume; o.connect(g); g.connect(audioCtx.destination); o.start(); g.gain.exponentialRampToValueAtTime(.001,audioCtx.currentTime+duration); o.stop(audioCtx.currentTime+duration); } catch(e){}
+  }
+  // Música original generada con Web Audio: no requiere archivos externos ni conexión.
+  function playMusicNote(freq, duration=0.22) {
+    if (!soundOn || !audioCtx) return;
+    try {
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+      gain.gain.setValueAtTime(0.0001, audioCtx.currentTime);
+      gain.gain.linearRampToValueAtTime(0.018, audioCtx.currentTime + 0.025);
+      gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + duration);
+      osc.connect(gain); gain.connect(audioCtx.destination);
+      osc.start(); osc.stop(audioCtx.currentTime + duration + 0.02);
+    } catch(e) {}
+  }
+  const melody = [523.25,659.25,783.99,659.25,587.33,698.46,880,698.46,523.25,659.25,783.99,1046.5,880,783.99,659.25,587.33];
+  function startMusic() {
+    if (!soundOn || musicTimer !== null) return;
+    try {
+      audioCtx ||= new (window.AudioContext || window.webkitAudioContext)();
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+    } catch(e) { return; }
+    musicStep = 0;
+    playMusicNote(melody[musicStep++ % melody.length], 0.28);
+    musicTimer = setInterval(() => {
+      if (!soundOn || !running) return;
+      playMusicNote(melody[musicStep++ % melody.length], 0.28);
+      if (musicStep % 4 === 0) playMusicNote(melody[(musicStep + 3) % melody.length] / 2, 0.34);
+    }, 280);
+  }
+  function stopMusic() {
+    if (musicTimer !== null) { clearInterval(musicTimer); musicTimer = null; }
+  }
+  function toneGood(){audio(660,.09);setTimeout(()=>audio(880,.12),80)}
+  function toneBad(){audio(170,.2,'sawtooth',.045)}
+  $('soundBtn').onclick=()=>{
+    soundOn=!soundOn;
+    $('soundBtn').textContent=soundOn?'🔊 Música y sonido: activados':'🔇 Música y sonido: apagados';
+    if(soundOn){audio(600,.08);if(running)startMusic()}else stopMusic();
+  };
+  $('fullscreenBtn').onclick=async()=>{
+    try {
+      const target=document.querySelector('.wrap');
+      if (!document.fullscreenElement) {
+        if (target.requestFullscreen) await target.requestFullscreen();
+        else if (target.webkitRequestFullscreen) target.webkitRequestFullscreen();
+        else { $('feedback').textContent='Pantalla completa no está disponible en este navegador; gira el celular para jugar en horizontal.'; return; }
+      } else if (document.exitFullscreen) await document.exitFullscreen();
+      else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
+    } catch(e) { $('feedback').textContent='Pantalla completa no está disponible aquí. Puedes jugar ajustando la pantalla o girando el celular.'; }
+  };
+  const updateFullscreenLabel=()=>{ $('fullscreenBtn').textContent=(document.fullscreenElement||document.webkitFullscreenElement)?'⤢ Salir de pantalla completa':'⛶ Pantalla completa'; };
+  document.addEventListener('fullscreenchange',updateFullscreenLabel);
+  document.addEventListener('webkitfullscreenchange',updateFullscreenLabel);
+  function showOverlay(title,text,buttonText,callback){
+    stopMusic();
+    $('overlayTitle').textContent=title; $('overlayText').textContent=text; $('startBtn').textContent=buttonText;
+    $('startBtn').onclick=callback; overlay.classList.remove('hidden');
+  }
+  function difficulty(){return exercise<5?'Básico':exercise<10?'Intermedio':'Avanzado'}
+  function makeProblem(){
+    let a,b,op,answer,statement;
+    if(level===0){
+      if(exercise<5){ a=rand(0,9); b=rand(0,9); op=Math.random()<.65?'+':'−'; if(op==='−'&&b>a)[a,b]=[b,a]; }
+      else if(exercise<10){a=rand(10,30);b=rand(1,20);op=Math.random()<.5?'+':'−';if(op==='−'&&b>a)[a,b]=[b,a];}
+      else {a=rand(20,99);b=rand(10,49);op=Math.random()<.5?'+':'−';if(op==='−'&&b>a)[a,b]=[b,a];}
+      answer=op==='+'?a+b:a-b; statement=`${a} ${op} ${b} = ?`;
+    } else if(level===1){
+      if(exercise<5){a=rand(1,10);b=rand(2,3)}
+      else if(exercise<10){a=rand(11,30);b=rand(2,3)}
+      else {a=rand(31,99);b=rand(2,3)}
+      op='×';answer=a*b;statement=`${a} × ${b} = ?`;
+    } else {
+      a=rand(1,99); b=Math.random()<.5?2:3; answer=a*b; statement=b===2?`El doble de ${a} es…`:`El triple de ${a} es…`;
+    }
+    const options=new Set([answer]);
+    while(options.size<4){let wrong=answer+rand(-12,12);if(wrong>=0&&wrong!==answer)options.add(wrong)}
+    return {statement,answer,options:[...options].sort(()=>Math.random()-.5),difficulty:difficulty()};
+  }
+  function rand(min,max){return Math.floor(Math.random()*(max-min+1))+min}
+  function updateHUD(){
+    $('levelLabel').textContent=`${level+1} / 3`;
+    $('score').textContent=score;
+    $('timer').textContent=`${Math.max(0,Math.ceil(timeLeft))} s`;
+    $('errors').textContent=`${errors} / 3`;
+    $('progress').style.width=`${(exercise/15)*100}%`;
+    document.documentElement.style.setProperty('--accent',palettes[level].glow);
+    document.documentElement.style.setProperty('--bg1',palettes[level].sky);
+  }
+  function startExercise(){
+    if(errors>=3){restartGame();return}
+    timeLeft=30;timerAccumulator=0;spawnAccumulator=0;shots=[];particles=[];clouds=[];
+    currentProblem=makeProblem();
+    const opts=currentProblem.options;
+    // Place four answer clouds in lanes across the screen.
+    const laneXs=[145,365,595,815].sort(()=>Math.random()-.5);
+    opts.forEach((value,i)=>clouds.push({x:laneXs[i],y:rand(125,210),value,correct:value===currentProblem.answer,vy:13+level*3,phase:Math.random()*6,hit:false}));
+    updateHUD();draw();
+    $('feedback').textContent=`${currentProblem.difficulty}: ¡resuelve ${currentProblem.statement}`;
+  }
+  function startGame(){
+    level=0;exercise=0;score=0;errors=0;levelRestarts=[0,0,0];
+    ship={x:480,y:476,size:1,form:0,power:1,cooldown:0};running=true;
+    overlay.classList.add('hidden');startExercise();lastTime=performance.now();requestAnimationFrame(loop);audio(520,.1);startMusic();
+  }
+  function restartGame(){
+    running=false;audio(130,.3,'sawtooth');
+    const failedLevel=level;
+    levelRestarts[failedLevel]++;
+    let message=`Has cometido 3 errores. Volverás a empezar el nivel ${failedLevel+1}.`;
+    if(levelRestarts[failedLevel]>=3){
+      level=Math.max(0,failedLevel-1);
+      levelRestarts[failedLevel]=0;
+      errors=0;exercise=0;ship={x:480,y:476,size:1,form:0,power:1,cooldown:0};
+      message=failedLevel===0
+        ? 'Has reiniciado el nivel 1 tres veces. Como ya estás en el nivel más bajo, continuarás en el nivel 1 desde el inicio.'
+        : `Has reiniciado el nivel ${failedLevel+1} tres veces. Bajas al nivel ${level+1} y comenzarás ese nivel desde el inicio.`;
+    }
+    showOverlay('¡Vamos de nuevo!',`${message} ¡Respira, concéntrate y vuelve a intentarlo!`,'Reintentar nivel',()=>{
+      errors=0;exercise=0;ship={x:480,y:476,size:1,form:0,power:1,cooldown:0};
+      running=true;overlay.classList.add('hidden');startExercise();lastTime=performance.now();requestAnimationFrame(loop);updateHUD();startMusic();
+    });
+    updateHUD();
+    $('feedback').textContent='Reinicio del nivel tras tres errores.';
+  }
+  function answerHit(cloud){
+    if(!running||cloud.hit)return;
+    cloud.hit=true;
+    if(cloud.correct){
+      score+=10;toneGood();$('feedback').textContent='¡Correcto! +10 puntos. ¡Buen disparo!';
+      burst(cloud.x,cloud.y,'#8dffdb',18);
+      exercise++;
+      // The ship evolves during level 1 as the player earns points.
+      if(level===0){ship.size=Math.min(1.65,1+Math.floor(score/30)*.12);ship.form=Math.min(3,Math.floor(score/50));ship.power=Math.min(3,1+Math.floor(score/60))}
+      updateHUD();
+      if(exercise>=15){setTimeout(completeLevel,650)} else {setTimeout(()=>{if(running)startExercise()},500)}
+    } else {
+      score-=5;errors++;toneBad();$('feedback').textContent='¡Ups! Esa nube no era. −5 puntos.';
+      burst(cloud.x,cloud.y,'#ff7b83',12);updateHUD();
+      if(errors>=3){setTimeout(restartGame,450)} else {
+        // Wrong answers count as an error; allow another shot at the same exercise.
+        setTimeout(()=>{if(running){clouds=clouds.filter(c=>!c.hit);clouds.push({x:rand(100,860),y:rand(130,205),value:currentProblem.answer,correct:true,vy:13+level*3,phase:Math.random()*6,hit:false});}},250);
+      }
+    }
+  }
+  function completeLevel(){
+    running=false;audio(740,.12);setTimeout(()=>audio(980,.18),130);
+    if(level<2){
+      showOverlay('🎉 ¡Felicidades, eres el mejor!',`¡Terminaste el nivel ${level+1} con ${score} puntos! Prepárate para el nivel ${level+2}. El color del espacio y los desafíos cambiarán.`, 'Ir al siguiente nivel',()=>{
+        level++;exercise=0;errors=0;levelRestarts[level]=0;ship.size=1;ship.form=0;ship.power=1;running=true;overlay.classList.add('hidden');startExercise();lastTime=performance.now();requestAnimationFrame(loop);startMusic();
+      });
+    } else {
+      $('progress').style.width='100%';
+      showOverlay('🏆 ¡Felicidades, eres el mejor!',`¡Completaste los 3 niveles y los 45 ejercicios! Puntaje final: ${score}. ¡Eres un campeón de LucioMAT 1!`,'Jugar otra vez',startGame);
+    }
+  }
+  function shoot(){
+    if(!running||ship.cooldown>0)return;
+    ship.cooldown=ship.power===1?.32:ship.power===2?.22:.14;
+    const count=ship.power===1?1:ship.power===2?2:3;
+    for(let i=0;i<count;i++) shots.push({x:ship.x+(i-(count-1)/2)*13,y:ship.y-24,vy:390});
+    audio(340,.045,'square',.025);
+  }
+  function burst(x,y,color,n){for(let i=0;i<n;i++)particles.push({x,y,vx:(Math.random()-.5)*180,vy:(Math.random()-.5)*180,life:.5,color})}
+  function loop(now){
+    if(!running)return;
+    const dt=Math.min((now-lastTime)/1000,.04);lastTime=now;
+    timerAccumulator+=dt; if(timerAccumulator>=1){timeLeft-=1;timerAccumulator=0;updateHUD();if(timeLeft<=0){errors++;score-=5;toneBad();updateHUD();if(errors>=3){restartGame();return}else{ $('feedback').textContent='¡Se acabó el tiempo! −5 puntos. Intenta otra vez.';startExercise();}}}
+    if(keys.ArrowLeft||keys.a||keys.A)ship.x-=310*dt;
+    if(keys.ArrowRight||keys.d||keys.D)ship.x+=310*dt;
+    ship.x=Math.max(40,Math.min(920,ship.x));ship.cooldown=Math.max(0,ship.cooldown-dt);
+    shots.forEach(s=>s.y-=s.vy*dt);shots=shots.filter(s=>s.y>-20);
+    clouds.forEach(c=>{c.y+=c.vy*dt;c.phase+=dt*2;});
+    // Clouds that reach the lower danger zone count as an error, once per exercise.
+    if(clouds.some(c=>c.y>430&&!c.hit)){
+      errors++;score-=5;toneBad();updateHUD();
+      if(errors>=3){restartGame();return}else{startExercise()}
+    }
+    for(const s of shots){for(const c of clouds){if(!c.hit&&Math.abs(s.x-c.x)<68&&Math.abs(s.y-c.y)<38){s.y=-100;answerHit(c);break}}}
+    particles.forEach(p=>{p.x+=p.vx*dt;p.y+=p.vy*dt;p.life-=dt});particles=particles.filter(p=>p.life>0);
+    draw();requestAnimationFrame(loop);
+  }
+  function drawCloud(c){
+    const x=c.x,y=c.y+Math.sin(c.phase)*3;
+    ctx.save();ctx.translate(x,y);
+    ctx.fillStyle=palettes[level].cloud;ctx.strokeStyle=palettes[level].cloudEdge;ctx.lineWidth=2;
+    ctx.beginPath();ctx.arc(-29,4,19,0,Math.PI*2);ctx.arc(-10,-8,24,0,Math.PI*2);ctx.arc(15,-5,27,0,Math.PI*2);ctx.arc(34,6,18,0,Math.PI*2);ctx.closePath();ctx.fill();ctx.stroke();
+    ctx.fillStyle='#10264b';ctx.font='bold 25px Arial';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(c.value,3,5);
+    ctx.restore();
+  }
+  function drawShip(){
+    ctx.save();ctx.translate(ship.x,ship.y);ctx.scale(ship.size,ship.size);
+    ctx.shadowColor=palettes[level].glow;ctx.shadowBlur=18;
+    ctx.fillStyle=palettes[level].ship;
+    if(ship.form===0){ctx.beginPath();ctx.moveTo(0,-28);ctx.lineTo(21,20);ctx.lineTo(0,12);ctx.lineTo(-21,20);ctx.closePath();ctx.fill()}
+    else if(ship.form===1){ctx.beginPath();ctx.moveTo(0,-31);ctx.lineTo(12,-3);ctx.lineTo(30,17);ctx.lineTo(9,13);ctx.lineTo(0,22);ctx.lineTo(-9,13);ctx.lineTo(-30,17);ctx.lineTo(-12,-3);ctx.closePath();ctx.fill()}
+    else if(ship.form===2){ctx.fillRect(-9,-27,18,48);ctx.beginPath();ctx.moveTo(0,-37);ctx.lineTo(20,4);ctx.lineTo(10,15);ctx.lineTo(-10,15);ctx.lineTo(-20,4);ctx.closePath();ctx.fill();ctx.fillRect(-30,6,15,8);ctx.fillRect(15,6,15,8)}
+    else {ctx.beginPath();ctx.moveTo(0,-39);ctx.lineTo(11,-8);ctx.lineTo(33,14);ctx.lineTo(12,11);ctx.lineTo(0,25);ctx.lineTo(-12,11);ctx.lineTo(-33,14);ctx.lineTo(-11,-8);ctx.closePath();ctx.fill();ctx.fillStyle='#fff27a';ctx.fillRect(-4,-10,8,18)}
+    ctx.shadowBlur=0;ctx.fillStyle='#ff9e55';ctx.beginPath();ctx.moveTo(-7,18);ctx.lineTo(0,32+Math.random()*6);ctx.lineTo(7,18);ctx.fill();
+    ctx.restore();
+  }
+  function draw(){
+    const p=palettes[level];ctx.clearRect(0,0,960,540);
+    const grad=ctx.createLinearGradient(0,0,0,540);grad.addColorStop(0,p.sky);grad.addColorStop(1,'#030817');ctx.fillStyle=grad;ctx.fillRect(0,0,960,540);
+    stars.forEach(s=>{s.y+=s.speed*.012;if(s.y>540)s.y=0;ctx.fillStyle=p.star;ctx.globalAlpha=.35+Math.random()*.6;ctx.beginPath();ctx.arc(s.x,s.y,s.r,0,Math.PI*2);ctx.fill()});ctx.globalAlpha=1;
+    ctx.fillStyle='#ffffffd9';ctx.textAlign='center';ctx.font='bold 31px Arial';ctx.fillText(currentProblem?currentProblem.statement:'LucioMAT 1',480,52);
+    ctx.font='bold 14px Arial';ctx.fillStyle=p.glow;ctx.fillText(`NIVEL ${level+1} · EJERCICIO ${Math.min(exercise+1,15)} DE 15 · ${currentProblem?currentProblem.difficulty.toUpperCase():''}`,480,79);
+    clouds.filter(c=>!c.hit).forEach(drawCloud);
+    shots.forEach(s=>{ctx.shadowColor=p.glow;ctx.shadowBlur=12;ctx.fillStyle=p.shot;ctx.fillRect(s.x-3,s.y-12,6,18);ctx.shadowBlur=0});
+    particles.forEach(pt=>{ctx.globalAlpha=Math.max(0,pt.life*2);ctx.fillStyle=pt.color;ctx.beginPath();ctx.arc(pt.x,pt.y,3,0,Math.PI*2);ctx.fill()});ctx.globalAlpha=1;
+    // Danger line and progress label
+    ctx.strokeStyle='#ff6b7b99';ctx.setLineDash([8,8]);ctx.beginPath();ctx.moveTo(0,430);ctx.lineTo(960,430);ctx.stroke();ctx.setLineDash([]);
+    drawShip();
+    ctx.fillStyle='#ffffffa8';ctx.font='13px Arial';ctx.textAlign='left';ctx.fillText(`Potencia de disparo: ${ship.power}`,18,520);
+    if(level===0&&score>=30){ctx.textAlign='right';ctx.fillText('¡Tu nave está evolucionando!',942,520)}
+  }
+  function moveShipToClientX(clientX){
+    const rect=canvas.getBoundingClientRect();
+    if(!rect.width)return;
+    const scaleX=canvas.width/rect.width;
+    ship.x=Math.max(40,Math.min(920,(clientX-rect.left)*scaleX));
+  }
+  canvas.addEventListener('pointermove',e=>{ moveShipToClientX(e.clientX); });
+  canvas.addEventListener('pointerdown',e=>{
+    if(e.pointerType==='touch') { e.preventDefault(); moveShipToClientX(e.clientX); }
+  },{passive:false});
+  canvas.addEventListener('click',()=>shoot());
+  function holdMove(key,button){
+    const down=e=>{e.preventDefault();keys[key]=true;};
+    const up=e=>{e.preventDefault();keys[key]=false;};
+    button.addEventListener('pointerdown',down,{passive:false});
+    button.addEventListener('pointerup',up,{passive:false});
+    button.addEventListener('pointercancel',up,{passive:false});
+    button.addEventListener('pointerleave',up,{passive:false});
+    button.addEventListener('contextmenu',e=>e.preventDefault());
+  }
+  holdMove('ArrowLeft',$('leftBtn'));
+  holdMove('ArrowRight',$('rightBtn'));
+  $('fireBtn').addEventListener('pointerdown',e=>{e.preventDefault();shoot();},{passive:false});
+  $('fireBtn').addEventListener('click',e=>{e.preventDefault();shoot();});
+  window.addEventListener('keydown',e=>{keys[e.key]=true;if(e.code==='Space'){e.preventDefault();shoot()}});
+  window.addEventListener('keyup',e=>{keys[e.key]=false});
+  window.addEventListener('blur',()=>{keys={};});
+  window.addEventListener('resize',()=>{draw();});
+  window.addEventListener('orientationchange',()=>{setTimeout(()=>{draw();},150);});
+  $('startBtn').onclick=startGame;
+  draw();
+})();
+</script>
+</body>
+</html>
